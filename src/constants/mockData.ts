@@ -14,6 +14,8 @@ export const DEFAULT_ASSESSMENTS: AssessmentItem[] = [
     type: 'recorded',
     score: 82,
     status: 'completed',
+    spokenResponse:
+      'Hello, thank you for this opportunity. I am a software engineer with over three years of experience building web and mobile applications. I enjoy solving complex problems, working closely with cross-functional teams, and building scalable user-focused digital experiences.',
     feedback:
       'Strong opening with a well-structured chronological overview of your background. Your voice modulation and pacing were confident. To reach an elite level, tighten your transition into recent accomplishments and quantify key achievements.',
     date: 'Today, 2:30 PM',
@@ -26,6 +28,8 @@ export const DEFAULT_ASSESSMENTS: AssessmentItem[] = [
     type: 'recorded',
     score: 65,
     status: 'completed',
+    spokenResponse:
+      'In my previous project, we faced a tight release deadline while integrating a third-party payment system with breaking changes. I prioritized the critical user journeys, coordinated with the vendor API team, and successfully delivered the update on schedule.',
     feedback:
       'Good context provided, but the response spent too much time describing the problem rather than the STAR method action items. Pace slowed down in the second half with multiple filler words ("um", "like"). Work on concise structuring.',
     date: 'Yesterday, 11:15 AM',
@@ -49,6 +53,8 @@ export const DEFAULT_ASSESSMENTS: AssessmentItem[] = [
     question: 'Explain your current project',
     type: 'recorded',
     status: 'pending',
+    spokenResponse:
+      'My current project is an AI communication coaching platform that evaluates candidate speech patterns, structure, and pacing to give instant personalized feedback.',
     date: 'Just now',
     category: 'Technical Pitch',
     durationOrWords: '1 min 20 sec',
@@ -61,6 +67,8 @@ export const DEFAULT_ASSESSMENTS: AssessmentItem[] = [
     type: 'recorded',
     score: 88,
     status: 'completed',
+    spokenResponse:
+      'When our design and engineering teams had differing views on project scope, I scheduled a sync to understand their perspective, presented technical trade-offs, and reached a collaborative consensus.',
     feedback:
       'Exceptional empathy and clarity in articulating how you listened first before proposing a collaborative solution. Excellent non-defensive language and steady articulation.',
     date: 'Oct 2, 2026',
@@ -102,6 +110,13 @@ export const generateLargeDataset = (count: number = 100): AssessmentItem[] => {
     'Lacks concrete examples. Structure the narrative with the STAR framework for better impact.',
   ];
 
+  const sampleSpokenResponses = [
+    'To tackle this, I assess the urgency and business impact first, align with stakeholders on deliverables, and execute focused milestone sprints.',
+    'I believe in empathetic, direct communication. I prepare specific observations, highlight growth opportunities, and establish a clear collaborative improvement plan.',
+    'I take complete ownership, explain the root cause transparently, and provide an updated, risk-mitigated timeline with immediate deliverables.',
+    'Our platform empowers professionals to practice speech clarity, receive real-time AI scoring, and accelerate their career growth with data-backed coaching insights.',
+  ];
+
   return Array.from({ length: count }, (_, index) => {
     const qObj = questions[index % questions.length];
     const isPending = index % 7 === 0;
@@ -114,6 +129,9 @@ export const generateLargeDataset = (count: number = 100): AssessmentItem[] => {
       type: isRecorded ? 'recorded' : 'text',
       status: isPending ? 'pending' : 'completed',
       score,
+      spokenResponse: isRecorded
+        ? sampleSpokenResponses[index % sampleSpokenResponses.length]
+        : undefined,
       feedback: isPending ? undefined : feedbacks[index % feedbacks.length],
       date: `Sep ${Math.max(1, 30 - (index % 28))}, 2026`,
       category: qObj.cat,

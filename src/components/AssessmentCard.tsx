@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AssessmentItem } from '../types/assessment';
 import { COLORS, SCORE_THRESHOLD } from '../constants/theme';
@@ -13,6 +13,8 @@ interface AssessmentCardProps {
 export const AssessmentCard: React.FC<AssessmentCardProps> = React.memo(({ item }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
+  const [playbackProgress, setPlaybackProgress] = useState<number>(0);
+  const animIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isCompleted = item.status === 'completed';
   const hasScore = item.score !== undefined;
@@ -23,9 +25,68 @@ export const AssessmentCard: React.FC<AssessmentCardProps> = React.memo(({ item 
     setIsExpanded((prev) => !prev);
   }, []);
 
-  const toggleAudio = useCallback(() => {
-    setIsPlayingAudio((prev) => !prev);
+  // Cleanup speech and interval on unmount
+  useEffect(() => {
+    return () => {
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      if (animIntervalRef.current) {
+        clearInterval(animIntervalRef.current);
+      }
+    };
   }, []);
+
+  const toggleAudio = useCallback(() => {
+    if (isPlayingAudio) {
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      setIsPlayingAudio(false);
+      setPlaybackProgress(0);
+      if (animIntervalRef.current) {
+        clearInterval(animIntervalRef.current);
+      }
+    } else {
+      const textToSpeak =
+        item.spokenResponse ||
+        `Here is my recorded answer for: ${item.question}. I structured my response with clear observations, empathetic communication, and actionable outcomes.`;
+
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(textToSpeak);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+
+        utterance.onstart = () => {
+          setIsPlayingAudio(true);
+          setPlaybackProgress(0);
+          if (animIntervalRef.current) clearInterval(animIntervalRef.current);
+          animIntervalRef.current = setInterval(() => {
+            setPlaybackProgress((prev) => (prev >= 15 ? 0 : prev + 1));
+          }, 320);
+        };
+
+        utterance.onend = () => {
+          setIsPlayingAudio(false);
+          setPlaybackProgress(0);
+          if (animIntervalRef.current) clearInterval(animIntervalRef.current);
+        };
+
+        utterance.onerror = () => {
+          setIsPlayingAudio(false);
+          setPlaybackProgress(0);
+          if (animIntervalRef.current) clearInterval(animIntervalRef.current);
+        };
+
+        window.speechSynthesis.speak(utterance);
+      } else {
+        setIsPlayingAudio(true);
+        setTimeout(() => setIsPlayingAudio(false), 4000);
+      }
+    }
+  }, [isPlayingAudio, item.spokenResponse, item.question]);
 
   return (
     <View style={[styles.card, !isCompleted && styles.pendingCard]}>
@@ -86,13 +147,13 @@ export const AssessmentCard: React.FC<AssessmentCardProps> = React.memo(({ item 
       {/* Interactive Media Preview Section (Audio Player / Text Preview) */}
       <View style={styles.mediaPreviewContainer}>
         {isRecorded ? (
-          <View style={styles.audioPlayerBox}>
+          <View style={[styles.audioPlayerBox, isPlayingAudio && styles.audioPlayerBoxActive]}>
             <TouchableOpacity
-              style={styles.playButton}
+              style={[styles.playButton, isPlayingAudio && styles.playButtonActive]}
               onPress={toggleAudio}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel={isPlayingAudio ? 'Pause recording' : 'Play recording'}
+              accessibilityLabel={isPlayingAudio ? 'Pause candidate voice' : 'Play candidate voice'}
             >
               <Ionicons
                 name={isPlayingAudio ? 'pause' : 'play'}
@@ -103,24 +164,27 @@ export const AssessmentCard: React.FC<AssessmentCardProps> = React.memo(({ item 
             <View style={styles.audioTrackWrapper}>
               <View style={styles.audioWaveform}>
                 {[35, 65, 90, 45, 80, 100, 70, 50, 85, 40, 95, 60, 30, 75, 40].map(
-                  (height, idx) => (
-                    <View
-                      key={idx}
-                      style={[
-                        styles.waveBar,
-                        { height: `${height}%` },
-                        isPlayingAudio && idx < 8 ? styles.waveBarActive : null,
-                      ]}
-                    />
-                  )
+                  (height, idx) => {
+                    const isActive = isPlayingAudio && idx <= playbackProgress;
+                    return (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.waveBar,
+                          { height: `${height}%` },
+                          isActive ? styles.waveBarActive : null,
+                        ]}
+                      />
+                    );
+                  }
                 )}
               </View>
               <View style={styles.audioMetaRow}>
-                <Text style={styles.audioStatusText}>
+                <Text style={[styles.audioStatusText, isPlayingAudio && styles.audioStatusTextActive]}>
                   {isPlayingAudio
-                    ? 'Playing candidate audio...'
+                    ? '🔊 Playing Candidate Voice...'
                     : isCompleted
-                    ? 'Recorded Response'
+                    ? 'Recorded Candidate Answer'
                     : 'Candidate Audio (Pending AI Score)'}
                 </Text>
                 <Text style={styles.audioDurationText}>
@@ -354,6 +418,10 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     gap: 12,
   },
+  audioPlayerBoxActive: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#C7D2FE',
+  },
   playButton: {
     width: 34,
     height: 34,
@@ -366,6 +434,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 2,
+  },
+  playButtonActive: {
+    backgroundColor: '#4338CA',
+    transform: [{ scale: 1.05 }],
   },
   audioTrackWrapper: {
     flex: 1,
@@ -395,6 +467,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: COLORS.textSecondary,
+  },
+  audioStatusTextActive: {
+    color: COLORS.primary,
+    fontWeight: '700',
   },
   audioDurationText: {
     fontSize: 11,

@@ -11,6 +11,7 @@ export interface AssessmentItem {
   score?: number; // 0 - 100, undefined if pending
   status: AssessmentStatus;
   feedback?: string; // AI-generated feedback
+  spokenResponse?: string; // Spoken audio transcript for TTS playback
   date?: string;
   category?: string;
   durationOrWords?: string; // e.g. "1m 45s" for recorded or "240 words" for text
